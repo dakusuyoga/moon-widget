@@ -12,26 +12,42 @@
       background: transparent;
       color: #1a1a1a;
       padding: 16px;
+      transition: color 0.2s;
     }
 
-    @media (prefers-color-scheme: dark) {
-      body { color: #e8e8e8; }
-      .moon-card { background: #2a2a2a; }
-      .moon-label, .moon-sub, .footer { color: #999; }
-      .moon-value, .moon-phase-name { color: #e8e8e8; }
-      .moon-illum { color: #aaa; }
-      .moon-hero { border-bottom-color: rgba(255,255,255,0.1); }
-    }
+    body.dark { color: #e8e8e8; }
+    body.dark .moon-card { background: #2a2a2a; }
+    body.dark .moon-label, body.dark .moon-sub, body.dark .footer { color: #999; }
+    body.dark .moon-value, body.dark .moon-phase-name, body.dark .moon-full-date { color: #e8e8e8; }
+    body.dark .moon-illum { color: #aaa; }
+    body.dark .moon-day { color: #999; }
+    body.dark .moon-hero { border-bottom-color: rgba(255,255,255,0.1); }
+    body.dark .toggle-btn { color: #aaa; border-color: rgba(255,255,255,0.15); }
+    body.dark .toggle-btn:hover { background: rgba(255,255,255,0.06); }
 
-    .moon-date {
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
       margin-bottom: 14px;
     }
+
     .moon-day { font-size: 13px; color: #888; margin-bottom: 2px; }
     .moon-full-date { font-size: 22px; font-weight: 500; }
 
-    @media (prefers-color-scheme: dark) {
-      .moon-day { color: #999; }
+    .toggle-btn {
+      background: none;
+      border: 0.5px solid rgba(0,0,0,0.18);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: #888;
+      cursor: pointer;
+      flex-shrink: 0;
+      margin-top: 2px;
+      transition: background 0.15s;
     }
+    .toggle-btn:hover { background: rgba(0,0,0,0.05); }
 
     .moon-hero {
       display: flex;
@@ -56,6 +72,7 @@
       background: #f5f4f0;
       border-radius: 8px;
       padding: 12px 14px;
+      transition: background 0.2s;
     }
 
     .moon-label {
@@ -146,18 +163,16 @@
 
       let path;
       if (illumination <= 2) {
-        path = `<circle cx="35" cy="35" r="${r}" fill="#2c2c2a" stroke="rgba(255,255,255,0.15)" stroke-width="0.5"/>`;
+        path = '<circle cx="35" cy="35" r="' + r + '" fill="#2c2c2a" stroke="rgba(255,255,255,0.15)" stroke-width="0.5"/>';
       } else if (illumination >= 98) {
-        path = `<circle cx="35" cy="35" r="${r}" fill="#e8e0c8"/>`;
+        path = '<circle cx="35" cy="35" r="' + r + '" fill="#e8e0c8"/>';
       } else {
         const lit = waxing ? "#e8e0c8" : "#2c2c2a";
         const dark = waxing ? "#2c2c2a" : "#e8e0c8";
-        path = `
-          <circle cx="35" cy="35" r="${r}" fill="${dark}" stroke="rgba(128,128,128,0.3)" stroke-width="0.5"/>
-          <path d="M 35 ${35-r} A ${xOval} ${r} 0 0 ${sweepOval} 35 ${35+r} A ${r} ${r} 0 0 ${sweep} 35 ${35-r} Z" fill="${lit}"/>
-        `;
+        path = '<circle cx="35" cy="35" r="' + r + '" fill="' + dark + '" stroke="rgba(128,128,128,0.3)" stroke-width="0.5"/>'
+             + '<path d="M 35 ' + (35-r) + ' A ' + xOval + ' ' + r + ' 0 0 ' + sweepOval + ' 35 ' + (35+r) + ' A ' + r + ' ' + r + ' 0 0 ' + sweep + ' 35 ' + (35-r) + ' Z" fill="' + lit + '"/>';
       }
-      return `<svg class="moon-svg" width="70" height="70" viewBox="0 0 70 70" aria-hidden="true">${path}</svg>`;
+      return '<svg class="moon-svg" width="70" height="70" viewBox="0 0 70 70" aria-hidden="true">' + path + '</svg>';
     }
 
     function approxMoonrise(age, cycle, sunriseStr) {
@@ -171,7 +186,7 @@
       const moonHr = (hr + offset) % 24;
       const hh = moonHr % 12 || 12;
       const ap = moonHr < 12 ? "AM" : "PM";
-      return `${hh}:00 ${ap}`;
+      return hh + ":00 " + ap;
     }
 
     function sunTimes(lat, lng, date) {
@@ -193,7 +208,7 @@
         const hh = Math.floor(h) % 12 || 12;
         const mm = String(Math.round((h - Math.floor(h)) * 60)).padStart(2, '0');
         const ap = Math.floor(h) < 12 ? "AM" : "PM";
-        return `${hh}:${mm} ${ap}`;
+        return hh + ":" + mm + " " + ap;
       }
       return {
         rise: fmt(12 - H / 15 - lng / 15),
@@ -209,47 +224,41 @@
     const nextNew  = nextPhaseDate(age, cycle, cycle);
     const sun = sunTimes(LAT, LNG, now);
     const moonrise = sun ? approxMoonrise(age, cycle, sun.rise) : "—";
-
     const dayName = now.toLocaleDateString('en-CA', { weekday: 'long' });
     const fullDate = now.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
 
-    document.getElementById('moon-widget').innerHTML = `
-      <div class="moon-date">
-        <p class="moon-day">${dayName}</p>
-        <p class="moon-full-date">${fullDate}</p>
-      </div>
-      <div class="moon-hero">
-        ${moonSVG(age, illumination, cycle)}
-        <div>
-          <p class="moon-phase-name">${name}</p>
-          <p class="moon-illum">${illumination}% illuminated &middot; day ${Math.round(age)} of cycle</p>
-          <p class="moon-illum">&#9800; ${sign}</p>
-        </div>
-      </div>
-      <div class="moon-grid">
-        <div class="moon-card">
-          <p class="moon-label">Next full moon</p>
-          <p class="moon-value">${daysUntil(nextFull)}d</p>
-          <p class="moon-sub">${formatDate(nextFull)}</p>
-        </div>
-        <div class="moon-card">
-          <p class="moon-label">Next new moon</p>
-          <p class="moon-value">${daysUntil(nextNew)}d</p>
-          <p class="moon-sub">${formatDate(nextNew)}</p>
-        </div>
-        <div class="moon-card">
-          <p class="moon-label">Moonrise (approx)</p>
-          <p class="moon-value">${moonrise}</p>
-          <p class="moon-sub">Toronto</p>
-        </div>
-        <div class="moon-card">
-          <p class="moon-label">Sunrise / Sunset</p>
-          <p class="moon-value" style="font-size:13px;">${sun ? sun.rise + ' / ' + sun.set : '—'}</p>
-          <p class="moon-sub">Toronto</p>
-        </div>
-      </div>
-      <p class="footer">Calculated for Toronto</p>
-    `;
+    document.getElementById('moon-widget').innerHTML =
+      '<div class="top-bar">' +
+        '<div class="moon-date">' +
+          '<p class="moon-day">' + dayName + '</p>' +
+          '<p class="moon-full-date">' + fullDate + '</p>' +
+        '</div>' +
+        '<button class="toggle-btn" id="theme-toggle" aria-label="Toggle dark mode">Dark</button>' +
+      '</div>' +
+      '<div class="moon-hero">' +
+        moonSVG(age, illumination, cycle) +
+        '<div>' +
+          '<p class="moon-phase-name">' + name + '</p>' +
+          '<p class="moon-illum">' + illumination + '% illuminated &middot; day ' + Math.round(age) + ' of cycle</p>' +
+          '<p class="moon-illum">&#9800; ' + sign + '</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="moon-grid">' +
+        '<div class="moon-card"><p class="moon-label">Next full moon</p><p class="moon-value">' + daysUntil(nextFull) + 'd</p><p class="moon-sub">' + formatDate(nextFull) + '</p></div>' +
+        '<div class="moon-card"><p class="moon-label">Next new moon</p><p class="moon-value">' + daysUntil(nextNew) + 'd</p><p class="moon-sub">' + formatDate(nextNew) + '</p></div>' +
+        '<div class="moon-card"><p class="moon-label">Moonrise (approx)</p><p class="moon-value">' + moonrise + '</p><p class="moon-sub">Toronto</p></div>' +
+        '<div class="moon-card"><p class="moon-label">Sunrise / Sunset</p><p class="moon-value" style="font-size:13px;">' + (sun ? sun.rise + ' / ' + sun.set : '—') + '</p><p class="moon-sub">Toronto</p></div>' +
+      '</div>' +
+      '<p class="footer">Calculated for Toronto</p>';
+
+    const btn = document.getElementById('theme-toggle');
+    let dark = false;
+    btn.addEventListener('click', function() {
+      dark = !dark;
+      document.body.classList.toggle('dark', dark);
+      btn.textContent = dark ? 'Light' : 'Dark';
+    });
+
   })();
   </script>
 </body>
