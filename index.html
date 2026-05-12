@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moon Phase Widget</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: transparent;
+      color: #1a1a1a;
+      padding: 16px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body { color: #e8e8e8; }
+      .moon-card { background: #2a2a2a; }
+      .moon-label, .moon-sub, .footer { color: #999; }
+      .moon-value, .moon-phase-name { color: #e8e8e8; }
+      .moon-illum { color: #aaa; }
+      .moon-hero { border-bottom-color: rgba(255,255,255,0.1); }
+    }
+
+    .moon-date {
+      margin-bottom: 14px;
+    }
+    .moon-day { font-size: 13px; color: #888; margin-bottom: 2px; }
+    .moon-full-date { font-size: 22px; font-weight: 500; }
+
+    @media (prefers-color-scheme: dark) {
+      .moon-day { color: #999; }
+    }
+
+    .moon-hero {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding-bottom: 16px;
+      border-bottom: 0.5px solid rgba(0,0,0,0.12);
+      margin-bottom: 16px;
+    }
+
+    .moon-phase-name { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+    .moon-illum { font-size: 13px; color: #666; margin-top: 4px; }
+
+    .moon-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .moon-card {
+      background: #f5f4f0;
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+
+    .moon-label {
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+
+    .moon-value { font-size: 17px; font-weight: 500; }
+    .moon-sub { font-size: 11px; color: #888; margin-top: 3px; }
+
+    .footer {
+      font-size: 10px;
+      color: #aaa;
+      text-align: right;
+      margin-top: 6px;
+    }
+
+    svg.moon-svg { flex-shrink: 0; }
+  </style>
+</head>
+<body>
+  <div id="moon-widget"></div>
+
+  <script>
+  (function() {
+    const LAT = 43.70011, LNG = -79.4163;
+
+    function jdn(date) {
+      const y = date.getFullYear(), m = date.getMonth()+1, d = date.getDate();
+      return Math.floor((1461*(y+4800+Math.floor((m-14)/12)))/4)
+        + Math.floor((367*(m-2-12*Math.floor((m-14)/12)))/12)
+        - Math.floor((3*Math.floor((y+4900+Math.floor((m-14)/12))/100))/4)
+        + d - 32075;
+    }
+
+    function moonPhase(date) {
+      const known = new Date(2000, 0, 6, 18, 14, 0);
+      const cycle = 29.53058867;
+      const diff = (date - known) / (1000*60*60*24);
+      const age = ((diff % cycle) + cycle) % cycle;
+      return { age, illumination: Math.round(50*(1-Math.cos(age/cycle*2*Math.PI))), cycle };
+    }
+
+    function phaseName(age) {
+      if (age < 1.85)  return "New moon";
+      if (age < 7.38)  return "Waxing crescent";
+      if (age < 9.22)  return "First quarter";
+      if (age < 14.77) return "Waxing gibbous";
+      if (age < 16.61) return "Full moon";
+      if (age < 22.15) return "Waning gibbous";
+      if (age < 23.99) return "Third quarter";
+      return "Waning crescent";
+    }
+
+    function moonSign(date) {
+      const signs = ["Aries","Taurus","Gemini","Cancer","Leo","Virgo",
+                     "Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"];
+      const epoch = new Date(2000, 0, 1);
+      const days = (date - epoch) / 86400000;
+      const idx = Math.floor(((days / 27.321661) % 12 + 12) % 12);
+      return signs[Math.floor(idx)];
+    }
+
+    function nextPhaseDate(age, target, cycle) {
+      let diff = ((target - age) + cycle) % cycle;
+      if (diff < 0.5) diff += cycle;
+      return new Date(Date.now() + diff * 24 * 3600 * 1000);
+    }
+
+    function daysUntil(d) {
+      return Math.ceil((d - Date.now()) / 86400000);
+    }
+
+    function formatDate(d) {
+      return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+    }
+
+    function moonSVG(age, illumination, cycle) {
+      const r = 30;
+      const waxing = age < cycle / 2;
+      const pct = illumination / 100;
+      const xOval = r * Math.abs(1 - 2 * pct);
+      const sweepOval = waxing ? 1 : 0;
+      const sweep = pct < 0.5 ? (waxing ? 0 : 1) : (waxing ? 1 : 0);
+
+      let path;
+      if (illumination <= 2) {
+        path = `<circle cx="35" cy="35" r="${r}" fill="#2c2c2a" stroke="rgba(255,255,255,0.15)" stroke-width="0.5"/>`;
+      } else if (illumination >= 98) {
+        path = `<circle cx="35" cy="35" r="${r}" fill="#e8e0c8"/>`;
+      } else {
+        const lit = waxing ? "#e8e0c8" : "#2c2c2a";
+        const dark = waxing ? "#2c2c2a" : "#e8e0c8";
+        path = `
+          <circle cx="35" cy="35" r="${r}" fill="${dark}" stroke="rgba(128,128,128,0.3)" stroke-width="0.5"/>
+          <path d="M 35 ${35-r} A ${xOval} ${r} 0 0 ${sweepOval} 35 ${35+r} A ${r} ${r} 0 0 ${sweep} 35 ${35-r} Z" fill="${lit}"/>
+        `;
+      }
+      return `<svg class="moon-svg" width="70" height="70" viewBox="0 0 70 70" aria-hidden="true">${path}</svg>`;
+    }
+
+    function approxMoonrise(age, cycle, sunriseStr) {
+      const parts = sunriseStr.match(/(\d+):(\d+) (AM|PM)/);
+      if (!parts) return "—";
+      let hr = parseInt(parts[1]);
+      const ampm = parts[3];
+      if (ampm === "PM" && hr !== 12) hr += 12;
+      if (ampm === "AM" && hr === 12) hr = 0;
+      const offset = Math.round((age / cycle) * 24);
+      const moonHr = (hr + offset) % 24;
+      const hh = moonHr % 12 || 12;
+      const ap = moonHr < 12 ? "AM" : "PM";
+      return `${hh}:00 ${ap}`;
+    }
+
+    function sunTimes(lat, lng, date) {
+      const D2R = Math.PI / 180;
+      const d = jdn(date) - 2451545.0 + 0.5;
+      const g = (357.528 + 0.9856003 * d) % 360;
+      const L = (280.460 + 0.9856474 * d) % 360;
+      const lam = L + 1.915 * Math.sin(g * D2R) + 0.020 * Math.sin(2 * g * D2R);
+      const eps = 23.439 - 0.0000004 * d;
+      const sinDec = Math.sin(eps * D2R) * Math.sin(lam * D2R);
+      const dec = Math.asin(sinDec) / D2R;
+      const cosH = (Math.sin(-0.833 * D2R) - Math.sin(lat * D2R) * Math.sin(dec * D2R))
+                   / (Math.cos(lat * D2R) * Math.cos(dec * D2R));
+      if (cosH > 1 || cosH < -1) return null;
+      const H = Math.acos(cosH) / D2R;
+      const offset = -date.getTimezoneOffset() / 60;
+      function fmt(utHr) {
+        let h = ((utHr + offset) % 24 + 24) % 24;
+        const hh = Math.floor(h) % 12 || 12;
+        const mm = String(Math.round((h - Math.floor(h)) * 60)).padStart(2, '0');
+        const ap = Math.floor(h) < 12 ? "AM" : "PM";
+        return `${hh}:${mm} ${ap}`;
+      }
+      return {
+        rise: fmt(12 - H / 15 - lng / 15),
+        set:  fmt(12 + H / 15 - lng / 15)
+      };
+    }
+
+    const now = new Date();
+    const { age, illumination, cycle } = moonPhase(now);
+    const name = phaseName(age);
+    const sign = moonSign(now);
+    const nextFull = nextPhaseDate(age, cycle / 2, cycle);
+    const nextNew  = nextPhaseDate(age, cycle, cycle);
+    const sun = sunTimes(LAT, LNG, now);
+    const moonrise = sun ? approxMoonrise(age, cycle, sun.rise) : "—";
+
+    const dayName = now.toLocaleDateString('en-CA', { weekday: 'long' });
+    const fullDate = now.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
+
+    document.getElementById('moon-widget').innerHTML = `
+      <div class="moon-date">
+        <p class="moon-day">${dayName}</p>
+        <p class="moon-full-date">${fullDate}</p>
+      </div>
+      <div class="moon-hero">
+        ${moonSVG(age, illumination, cycle)}
+        <div>
+          <p class="moon-phase-name">${name}</p>
+          <p class="moon-illum">${illumination}% illuminated &middot; day ${Math.round(age)} of cycle</p>
+          <p class="moon-illum">&#9800; ${sign}</p>
+        </div>
+      </div>
+      <div class="moon-grid">
+        <div class="moon-card">
+          <p class="moon-label">Next full moon</p>
+          <p class="moon-value">${daysUntil(nextFull)}d</p>
+          <p class="moon-sub">${formatDate(nextFull)}</p>
+        </div>
+        <div class="moon-card">
+          <p class="moon-label">Next new moon</p>
+          <p class="moon-value">${daysUntil(nextNew)}d</p>
+          <p class="moon-sub">${formatDate(nextNew)}</p>
+        </div>
+        <div class="moon-card">
+          <p class="moon-label">Moonrise (approx)</p>
+          <p class="moon-value">${moonrise}</p>
+          <p class="moon-sub">Toronto</p>
+        </div>
+        <div class="moon-card">
+          <p class="moon-label">Sunrise / Sunset</p>
+          <p class="moon-value" style="font-size:13px;">${sun ? sun.rise + ' / ' + sun.set : '—'}</p>
+          <p class="moon-sub">Toronto</p>
+        </div>
+      </div>
+      <p class="footer">Calculated for Toronto</p>
+    `;
+  })();
+  </script>
+</body>
+</html>
